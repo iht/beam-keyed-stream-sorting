@@ -17,12 +17,9 @@ package dev.herraiz.beam.transform;
 
 import com.google.auto.value.AutoValue;
 import dev.herraiz.protos.Events.MyDummyEvent;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 import org.apache.beam.sdk.state.*;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.Max;
