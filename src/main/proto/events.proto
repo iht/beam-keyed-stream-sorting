@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package dev.herraiz.protos;
+
+message MyDummyEvent {
+  string msg_key = 1;
+  int32 value = 2;
+  int64 event_timestamp = 3;
+}
