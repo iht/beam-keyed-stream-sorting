@@ -14,25 +14,11 @@ limitations under the License.
 */
 
 package dev.herraiz.beam.transform;
-/*
-Copyright 2023 Google.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-	http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 
 import static dev.herraiz.beam.utils.Events.generateData;
 
 import dev.herraiz.beam.utils.TestUtils;
-import dev.herraiz.protos.Events.MyDummyEvent;
+import dev.herraiz.protos.Events;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -50,7 +36,7 @@ import org.joda.time.Instant;
 import org.junit.Rule;
 import org.junit.Test;
 
-public class SortWithStateTest {
+public class SortWithAnnotationsTest {
     @Rule public TestPipeline pipeline = TestPipeline.create();
 
     // All messages will have the same key. The values themselves are not important
@@ -64,14 +50,15 @@ public class SortWithStateTest {
 
     /** Test that the windowing approach produces sorted data */
     @Test
-    public void testSortWithState() {
+    public void testSortWithAnnotations() {
         // Data
-        List<TimestampedValue<MyDummyEvent>> events = generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
+        List<TimestampedValue<Events.MyDummyEvent>> events =
+                generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
         Collections.shuffle(events); // Disorder data
 
         // Test stream
-        TestStream.Builder<MyDummyEvent> streamBuilder =
-                TestStream.create(ProtoCoder.of(MyDummyEvent.class));
+        TestStream.Builder<Events.MyDummyEvent> streamBuilder =
+                TestStream.create(ProtoCoder.of(Events.MyDummyEvent.class));
 
         Instant currentWatermark = TEST_EPOCH;
         for (int k = 0; k < NUM_EVENTS; k++) {
@@ -84,28 +71,28 @@ public class SortWithStateTest {
         currentWatermark = currentWatermark.plus(Duration.standardSeconds(2));
         streamBuilder.advanceProcessingTime(Duration.standardSeconds(2));
         streamBuilder.advanceWatermarkTo(currentWatermark);
-        TestStream<MyDummyEvent> stream = streamBuilder.advanceWatermarkToInfinity();
+        TestStream<Events.MyDummyEvent> stream = streamBuilder.advanceWatermarkToInfinity();
 
         // Pipeline
-        PCollection<MyDummyEvent> eventsPColl = pipeline.apply(stream);
-        PCollection<KV<String, MyDummyEvent>> keyedStream =
+        PCollection<Events.MyDummyEvent> eventsPColl = pipeline.apply(stream);
+        PCollection<KV<String, Events.MyDummyEvent>> keyedStream =
                 eventsPColl
                         .apply("Add key", WithKeys.of(e -> e.getMsgKey()))
                         .setCoder(
                                 KvCoder.of(
                                         AvroCoder.of(String.class),
-                                        ProtoCoder.of(MyDummyEvent.class)));
+                                        ProtoCoder.of(Events.MyDummyEvent.class)));
 
-        PCollection<KV<String, Iterable<MyDummyEvent>>> sorted =
+        PCollection<KV<String, Iterable<Events.MyDummyEvent>>> sorted =
                 keyedStream.apply(
                         "Sort with state", SortWithState.Transform.withSessionDuration(30));
 
-        PCollection<Iterable<MyDummyEvent>> keysDropped =
+        PCollection<Iterable<Events.MyDummyEvent>> keysDropped =
                 sorted.apply(
                         "Drop keys",
                         MapElements.into(
                                         TypeDescriptors.iterables(
-                                                TypeDescriptor.of(MyDummyEvent.class)))
+                                                TypeDescriptor.of(Events.MyDummyEvent.class)))
                                 .via(kv -> kv.getValue()));
 
         PCollection<Boolean> check = keysDropped.apply("Check", TestUtils.Check.isSorted());
