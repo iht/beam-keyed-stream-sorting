@@ -18,6 +18,7 @@ package dev.herraiz.pipelines;
 import static dev.herraiz.beam.data.Events.generateData;
 
 import dev.herraiz.beam.transform.SortWithWindows;
+import dev.herraiz.beam.utils.TestUtils;
 import dev.herraiz.protos.Events.MyDummyEvent;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,9 +32,6 @@ import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.transforms.MapElements;
 import org.apache.beam.sdk.transforms.WithKeys;
 import org.apache.beam.sdk.values.*;
-import org.checkerframework.checker.initialization.qual.Initialized;
-import org.checkerframework.checker.nullness.qual.NonNull;
-import org.checkerframework.checker.nullness.qual.UnknownKeyFor;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
 import org.junit.Rule;
@@ -53,7 +51,7 @@ public class SortWithWindowsTest {
 
     /** Test that the windowing approach produces sorted data */
     @Test
-    public void testSortWithWindows() throws NoSuchSchemaException {
+    public void testSortWithWindows() {
         // Data
         List<TimestampedValue<MyDummyEvent>> events = generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
 
@@ -63,10 +61,11 @@ public class SortWithWindowsTest {
 
         Instant currentWatermark = TEST_EPOCH;
         for (int k = 0; k < NUM_EVENTS; k++) {
-            streamBuilder
-                    .addElements(events.get(k))
-                    .advanceProcessingTime(Duration.standardSeconds(2))
-                    .advanceWatermarkTo(currentWatermark);
+            streamBuilder =
+                    streamBuilder
+                            .addElements(events.get(k))
+                            .advanceProcessingTime(Duration.standardSeconds(2))
+                            .advanceWatermarkTo(currentWatermark);
         }
         currentWatermark = currentWatermark.plus(Duration.standardSeconds(2));
         streamBuilder.advanceProcessingTime(Duration.standardSeconds(2));
@@ -87,7 +86,7 @@ public class SortWithWindowsTest {
                 keyedStream.apply(
                         "Sort with window", SortWithWindows.Transform.withSessionDuration(30));
 
-        PCollection<@UnknownKeyFor @NonNull @Initialized Iterable<MyDummyEvent>> keysDropped =
+        PCollection<Iterable<MyDummyEvent>> keysDropped =
                 sorted.apply(
                         "Drop keys",
                         MapElements.into(
@@ -95,8 +94,12 @@ public class SortWithWindowsTest {
                                                 TypeDescriptor.of(MyDummyEvent.class)))
                                 .via(kv -> kv.getValue()));
 
-        PAssert.thatSingleton(keysDropped)
-                .isEqualTo(events.stream().map(ts -> ts.getValue()).collect(Collectors.toList()));
+        PCollection<Boolean> check = keysDropped.apply("Check", TestUtils.Check.isSorted());
+
+        PAssert.thatSingleton("Windowed elements are sorted", check).isEqualTo(true);
+        PAssert.thatSingletonIterable("Same elements as input", keysDropped)
+                .containsInAnyOrder(
+                        events.stream().map(ts -> ts.getValue()).collect(Collectors.toList()));
 
         pipeline.run();
     }

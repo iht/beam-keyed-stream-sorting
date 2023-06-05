@@ -55,13 +55,14 @@ public class SortWithWindows {
         public PCollection<KV<String, Iterable<MyDummyEvent>>> expand(
                 PCollection<KV<String, MyDummyEvent>> input) {
 
-            PCollection<KV<String, MyDummyEvent>> windowed = input.apply(
-                    "Session windowing",
-                    Window.<KV<String, MyDummyEvent>>into(
-                                    Sessions.withGapDuration(Duration.standardSeconds(30)))
-                            .triggering(AfterWatermark.pastEndOfWindow())
-                            .discardingFiredPanes()
-                            .withAllowedLateness(Duration.ZERO));
+            PCollection<KV<String, MyDummyEvent>> windowed =
+                    input.apply(
+                            "Session windowing",
+                            Window.<KV<String, MyDummyEvent>>into(
+                                            Sessions.withGapDuration(Duration.standardSeconds(30)))
+                                    .triggering(AfterWatermark.pastEndOfWindow())
+                                    .discardingFiredPanes()
+                                    .withAllowedLateness(Duration.ZERO));
 
             PCollection<KV<String, Iterable<MyDummyEvent>>> grouped =
                     windowed.apply("Group by key", GroupByKey.create());
