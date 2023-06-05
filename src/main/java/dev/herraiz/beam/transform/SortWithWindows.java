@@ -16,7 +16,7 @@ limitations under the License.
 package dev.herraiz.beam.transform;
 
 import com.google.auto.value.AutoValue;
-import dev.herraiz.beam.data.Events;
+import dev.herraiz.beam.utils.Events;
 import dev.herraiz.protos.Events.MyDummyEvent;
 import java.util.List;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -38,15 +38,15 @@ public class SortWithWindows {
                     PCollection<KV<String, MyDummyEvent>>,
                     PCollection<KV<String, Iterable<MyDummyEvent>>>> {
 
-        public abstract int sessionDuration();
+        public abstract int sessionGap();
 
         public static Transform withSessionDuration(int d) {
-            return new AutoValue_SortWithWindows_Transform.Builder().sessionDuration(d).build();
+            return new AutoValue_SortWithWindows_Transform.Builder().sessionGap(d).build();
         }
 
         @AutoValue.Builder
         public abstract static class Builder {
-            public abstract Builder sessionDuration(int d);
+            public abstract Builder sessionGap(int d);
 
             public abstract Transform build();
         }

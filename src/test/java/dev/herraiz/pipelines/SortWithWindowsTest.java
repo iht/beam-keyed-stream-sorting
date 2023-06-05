@@ -15,11 +15,12 @@ limitations under the License.
 
 package dev.herraiz.pipelines;
 
-import static dev.herraiz.beam.data.Events.generateData;
+import static dev.herraiz.beam.utils.Events.generateData;
 
 import dev.herraiz.beam.transform.SortWithWindows;
 import dev.herraiz.beam.utils.TestUtils;
 import dev.herraiz.protos.Events.MyDummyEvent;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.beam.sdk.coders.KvCoder;
@@ -53,6 +54,7 @@ public class SortWithWindowsTest {
     public void testSortWithWindows() {
         // Data
         List<TimestampedValue<MyDummyEvent>> events = generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
+        Collections.shuffle(events); // Disorder data
 
         // Test stream
         TestStream.Builder<MyDummyEvent> streamBuilder =

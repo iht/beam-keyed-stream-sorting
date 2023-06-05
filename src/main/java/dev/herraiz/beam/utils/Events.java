@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package dev.herraiz.beam.data;
+package dev.herraiz.beam.utils;
 
 import dev.herraiz.protos.Events.MyDummyEvent;
 import java.util.ArrayList;
@@ -43,12 +43,20 @@ public class Events {
             Long shift = r.longs(100, 2999).findFirst().getAsLong();
             Long ts = testEpoch.plus(shift).plus(1000 * (k + 1)).getMillis();
 
-            MyDummyEvent event =
+            MyDummyEvent.Builder builder =
                     MyDummyEvent.newBuilder()
                             .setMsgKey(msgKey)
                             .setValue(r.nextInt(10)) // Random value
-                            .setEventTimestamp(ts)
-                            .build();
+                            .setEventTimestamp(ts);
+
+            // Is this the last message?
+            if (k == numEvents - 1) {
+                builder.setIsLastMsg(true);
+            } else {
+                builder.setIsLastMsg(false);
+            }
+
+            MyDummyEvent event = builder.build();
 
             TimestampedValue<MyDummyEvent> tsval =
                     TimestampedValue.of(event, new org.joda.time.Instant(ts));
