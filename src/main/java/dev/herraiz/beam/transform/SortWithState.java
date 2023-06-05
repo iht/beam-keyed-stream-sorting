@@ -26,6 +26,7 @@ import org.apache.beam.sdk.state.*;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.Max;
 import org.apache.beam.sdk.transforms.PTransform;
+import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.TimestampedValue;
@@ -42,8 +43,8 @@ public class SortWithState {
 
         public abstract int sessionGap();
 
-        public static Transform withSessionDuration(int d) {
-            return new AutoValue_SortWithState_Transform.Builder().sessionGap(d).build();
+        public static Transform withSessionDuration(int duration) {
+            return new AutoValue_SortWithState_Transform.Builder().sessionGap(duration).build();
         }
 
         @AutoValue.Builder
@@ -56,7 +57,8 @@ public class SortWithState {
         @Override
         public PCollection<KV<String, Iterable<MyDummyEvent>>> expand(
                 PCollection<KV<String, MyDummyEvent>> input) {
-            return null;
+            return input.apply(
+                    "Sort with state", ParDo.of(new RecoverSessionDoFn(this.sessionGap())));
         }
     }
 

@@ -40,8 +40,8 @@ public class SortWithWindows {
 
         public abstract int sessionGap();
 
-        public static Transform withSessionDuration(int d) {
-            return new AutoValue_SortWithWindows_Transform.Builder().sessionGap(d).build();
+        public static Transform withSessionDuration(int duration) {
+            return new AutoValue_SortWithWindows_Transform.Builder().sessionGap(duration).build();
         }
 
         @AutoValue.Builder
