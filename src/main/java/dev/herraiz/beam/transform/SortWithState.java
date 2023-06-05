@@ -17,6 +17,8 @@ package dev.herraiz.beam.transform;
 
 import com.google.auto.value.AutoValue;
 import dev.herraiz.protos.Events.MyDummyEvent;
+
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -135,6 +137,8 @@ public class SortWithState {
                     StreamSupport.stream(orderedListState.read().spliterator(), false)
                             .map(ts -> ts.getValue())
                             .collect(Collectors.toList());
+
+//            Collections.shuffle(events);
 
             receiver.outputWithTimestamp(
                     KV.of(key, events), Instant.ofEpochMilli(maxTimestampState.read()));

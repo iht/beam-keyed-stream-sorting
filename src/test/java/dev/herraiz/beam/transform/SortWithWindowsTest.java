@@ -54,6 +54,9 @@ public class SortWithWindowsTest {
         // Data
         List<TimestampedValue<MyDummyEvent>> events = generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
         Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
 
         // Test stream
         TestStream.Builder<MyDummyEvent> streamBuilder =

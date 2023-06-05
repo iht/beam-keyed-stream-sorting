@@ -46,7 +46,7 @@ public class Events {
             MyDummyEvent.Builder builder =
                     MyDummyEvent.newBuilder()
                             .setMsgKey(msgKey)
-                            .setValue(r.nextInt(10)) // Random value
+                            .setValue(k) // Sequential for easier debugging of order/lack of order
                             .setEventTimestamp(ts);
 
             // Is this the last message?

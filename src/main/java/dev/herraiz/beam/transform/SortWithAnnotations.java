@@ -17,6 +17,8 @@ package dev.herraiz.beam.transform;
 
 import com.google.auto.value.AutoValue;
 import dev.herraiz.protos.Events.MyDummyEvent;
+
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -103,6 +105,9 @@ public class SortWithAnnotations {
             // Update state
             currentKeyState.write(element.getKey());
             List<MyDummyEvent> events = eventsListState.read();
+            if (events == null) {
+                events = new ArrayList<>();
+            }
             events.add(element.getValue());
             eventsListState.write(events);
             maxTimestampState.add(elementTimestamp.getMillis());
@@ -126,17 +131,14 @@ public class SortWithAnnotations {
         public void onGapTimer(
                 @AlwaysFetched @StateId("currentKey") ValueState<String> currentKeyState,
                 @StateId("holdingUpAfterLastMsg") ValueState<Boolean> currentlyHoldingUpState,
-                @AlwaysFetched @StateId("elementsOrderedList")
-                        OrderedListState<MyDummyEvent> orderedListState,
+                @AlwaysFetched @StateId("elementsList")
+                        ValueState<List<MyDummyEvent>> eventsListState,
                 @AlwaysFetched @StateId("maxTimestampSeen")
                         CombiningState<Long, long[], Long> maxTimestampState,
                 OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
 
             String key = currentKeyState.read();
-            List<MyDummyEvent> events =
-                    StreamSupport.stream(orderedListState.read().spliterator(), false)
-                            .map(ts -> ts.getValue())
-                            .collect(Collectors.toList());
+            List<MyDummyEvent> events = eventsListState.read();
 
             // events.sort(new Events.MyDummyEventComparator()); <-- NO NEED TO SORT
 
@@ -145,7 +147,7 @@ public class SortWithAnnotations {
 
             currentKeyState.clear();
             currentlyHoldingUpState.clear();
-            orderedListState.clear();
+            eventsListState.clear();
             maxTimestampState.clear();
         }
     }

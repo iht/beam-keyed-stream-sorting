@@ -55,6 +55,9 @@ public class SortWithAnnotationsTest {
         List<TimestampedValue<Events.MyDummyEvent>> events =
                 generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
         Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
 
         // Test stream
         TestStream.Builder<Events.MyDummyEvent> streamBuilder =
@@ -85,7 +88,7 @@ public class SortWithAnnotationsTest {
 
         PCollection<KV<String, Iterable<Events.MyDummyEvent>>> sorted =
                 keyedStream.apply(
-                        "Sort with state", SortWithState.Transform.withSessionDuration(30));
+                        "Sort with state", SortWithAnnotations.Transform.withSessionDuration(30));
 
         PCollection<Iterable<Events.MyDummyEvent>> keysDropped =
                 sorted.apply(
