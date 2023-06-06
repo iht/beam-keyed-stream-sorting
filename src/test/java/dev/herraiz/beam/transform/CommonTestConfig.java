@@ -44,28 +44,26 @@ public class CommonTestConfig { // The stream begins at this moment
     // Number of events
     public static final int NUM_EVENTS = 5000;
 
-    public static TestPipeline buildTestPipeline(String textMsg,
-                                                 TestPipeline pipeline,
-                                                 PTransform<
-                                                         PCollection<KV<String, MyDummyEvent>>,
-                                                         PCollection<KV<String, Iterable<MyDummyEvent>>>> transform) {
-        return buildTestPipelineWithNumMessages(textMsg, pipeline, transform, NUM_EVENTS);
+    public static TestPipeline buildTestPipeline(
+            String textMsg,
+            List<TimestampedValue<MyDummyEvent>> events,
+            TestPipeline pipeline,
+            PTransform<
+                            PCollection<KV<String, MyDummyEvent>>,
+                            PCollection<KV<String, Iterable<MyDummyEvent>>>>
+                    transform) {
+        return buildTestPipelineWithNumMessages(textMsg, events, pipeline, transform, NUM_EVENTS);
     }
 
     public static TestPipeline buildTestPipelineWithNumMessages(
             String textMsg,
+            List<TimestampedValue<MyDummyEvent>> events,
             TestPipeline pipeline,
             PTransform<
                             PCollection<KV<String, MyDummyEvent>>,
                             PCollection<KV<String, Iterable<MyDummyEvent>>>>
                     transform,
             int numMessages) {
-        // Data
-        List<TimestampedValue<MyDummyEvent>> events = generateData(numMessages, MSG_KEY, TEST_EPOCH);
-        Collections.shuffle(events); // Disorder data
-        Collections.shuffle(events); // Disorder data
-        Collections.shuffle(events); // Disorder data
-        Collections.shuffle(events); // Disorder data
 
         // Test stream
         TestStream.Builder<MyDummyEvent> streamBuilder =
@@ -113,5 +111,15 @@ public class CommonTestConfig { // The stream begins at this moment
                         events.stream().map(ts -> ts.getValue()).collect(Collectors.toList()));
 
         return pipeline;
+    }
+
+    public static List<TimestampedValue<MyDummyEvent>> getTimestampedValues(int numMessages) {
+        List<TimestampedValue<MyDummyEvent>> events =
+                generateData(numMessages, MSG_KEY, TEST_EPOCH);
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        Collections.shuffle(events); // Disorder data
+        return events;
     }
 }

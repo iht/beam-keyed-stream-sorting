@@ -15,26 +15,34 @@ limitations under the License.
 
 package dev.herraiz.beam.transform;
 
-import static dev.herraiz.beam.transform.CommonTestConfig.buildTestPipeline;
-import static dev.herraiz.beam.transform.CommonTestConfig.buildTestPipelineWithNumMessages;
+import static dev.herraiz.beam.transform.CommonTestConfig.*;
 
+import dev.herraiz.protos.Events;
+import java.util.List;
 import org.apache.beam.sdk.testing.TestPipeline;
+import org.apache.beam.sdk.values.TimestampedValue;
 import org.junit.Before;
-import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 
 public class SortingTests {
     @Rule public transient TestPipeline pipeline = TestPipeline.create();
 
+    private static final List<TimestampedValue<Events.MyDummyEvent>> events =
+            getTimestampedValues(NUM_EVENTS);
+
     @Before
     public void testDummyIgnore() {
+
+        // Warm up test with small set
+        int smallSetSize = 10;
         pipeline =
                 buildTestPipelineWithNumMessages(
                         "Windowed elements are sorted",
+                        getTimestampedValues(smallSetSize),
                         pipeline,
                         SortWithWindows.Transform.withSessionDuration(30),
-                        10);
+                        smallSetSize);
 
         pipeline.run();
     }
@@ -44,6 +52,7 @@ public class SortingTests {
         pipeline =
                 buildTestPipeline(
                         "Annotation list is sorted",
+                        events,
                         pipeline,
                         SortWithAnnotations.Transform.withSessionDuration(30));
 
@@ -55,6 +64,7 @@ public class SortingTests {
         pipeline =
                 buildTestPipeline(
                         "Windowed elements are sorted",
+                        events,
                         pipeline,
                         SortWithMapState.Transform.withSessionDuration(30));
 
@@ -66,6 +76,7 @@ public class SortingTests {
         pipeline =
                 buildTestPipeline(
                         "State list is sorted",
+                        events,
                         pipeline,
                         SortWithState.Transform.withSessionDuration(30));
 
@@ -77,6 +88,7 @@ public class SortingTests {
         pipeline =
                 buildTestPipeline(
                         "Windowed elements are sorted",
+                        events,
                         pipeline,
                         SortWithWindows.Transform.withSessionDuration(30));
 
