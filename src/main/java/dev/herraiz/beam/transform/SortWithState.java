@@ -136,8 +136,6 @@ public class SortWithState {
                             .map(ts -> ts.getValue())
                             .collect(Collectors.toList());
 
-            //            Collections.shuffle(events);
-
             receiver.outputWithTimestamp(
                     KV.of(key, events), Instant.ofEpochMilli(maxTimestampState.read()));
 
