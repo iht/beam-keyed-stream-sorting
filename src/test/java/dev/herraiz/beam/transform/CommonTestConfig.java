@@ -18,7 +18,7 @@ package dev.herraiz.beam.transform;
 import static dev.herraiz.beam.utils.Events.generateData;
 
 import dev.herraiz.beam.utils.TestUtils;
-import dev.herraiz.protos.Events;
+import dev.herraiz.protos.Events.MyDummyEvent;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -29,42 +29,50 @@ import org.apache.beam.sdk.testing.PAssert;
 import org.apache.beam.sdk.testing.TestPipeline;
 import org.apache.beam.sdk.testing.TestStream;
 import org.apache.beam.sdk.transforms.MapElements;
+import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.WithKeys;
 import org.apache.beam.sdk.values.*;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
-import org.junit.Rule;
-import org.junit.Test;
 
-public class SortWithAnnotationsTest {
-    @Rule public TestPipeline pipeline = TestPipeline.create();
+public class CommonTestConfig { // The stream begins at this moment
+    public static final Instant TEST_EPOCH = Instant.parse("2017-02-03T10:37:30.00Z");
 
     // All messages will have the same key. The values themselves are not important
-    private final String MSG_KEY = "my msg key";
-
-    // The stream begins at this moment
-    private final Instant TEST_EPOCH = Instant.parse("2017-02-03T10:37:30.00Z");
+    public static final String MSG_KEY = "my msg key";
 
     // Number of events
-    private final int NUM_EVENTS = 10;
+    public static final int NUM_EVENTS = 5000;
 
-    /** Test that the windowing approach produces sorted data */
-    @Test
-    public void testSortWithAnnotations() {
+    public static TestPipeline buildTestPipeline(String textMsg,
+                                                 TestPipeline pipeline,
+                                                 PTransform<
+                                                         PCollection<KV<String, MyDummyEvent>>,
+                                                         PCollection<KV<String, Iterable<MyDummyEvent>>>> transform) {
+        return buildTestPipelineWithNumMessages(textMsg, pipeline, transform, NUM_EVENTS);
+    }
+
+    public static TestPipeline buildTestPipelineWithNumMessages(
+            String textMsg,
+            TestPipeline pipeline,
+            PTransform<
+                            PCollection<KV<String, MyDummyEvent>>,
+                            PCollection<KV<String, Iterable<MyDummyEvent>>>>
+                    transform,
+            int numMessages) {
         // Data
-        List<TimestampedValue<Events.MyDummyEvent>> events =
-                generateData(NUM_EVENTS, MSG_KEY, TEST_EPOCH);
+        List<TimestampedValue<MyDummyEvent>> events = generateData(numMessages, MSG_KEY, TEST_EPOCH);
         Collections.shuffle(events); // Disorder data
         Collections.shuffle(events); // Disorder data
         Collections.shuffle(events); // Disorder data
         Collections.shuffle(events); // Disorder data
 
         // Test stream
-        TestStream.Builder<Events.MyDummyEvent> streamBuilder =
-                TestStream.create(ProtoCoder.of(Events.MyDummyEvent.class));
+        TestStream.Builder<MyDummyEvent> streamBuilder =
+                TestStream.create(ProtoCoder.of(MyDummyEvent.class));
 
         Instant currentWatermark = TEST_EPOCH;
-        for (int k = 0; k < NUM_EVENTS; k++) {
+        for (int k = 0; k < numMessages; k++) {
             streamBuilder =
                     streamBuilder
                             .addElements(events.get(k))
@@ -74,37 +82,36 @@ public class SortWithAnnotationsTest {
         currentWatermark = currentWatermark.plus(Duration.standardSeconds(2));
         streamBuilder.advanceProcessingTime(Duration.standardSeconds(2));
         streamBuilder.advanceWatermarkTo(currentWatermark);
-        TestStream<Events.MyDummyEvent> stream = streamBuilder.advanceWatermarkToInfinity();
+        TestStream<MyDummyEvent> stream = streamBuilder.advanceWatermarkToInfinity();
 
         // Pipeline
-        PCollection<Events.MyDummyEvent> eventsPColl = pipeline.apply(stream);
-        PCollection<KV<String, Events.MyDummyEvent>> keyedStream =
+        PCollection<MyDummyEvent> eventsPColl = pipeline.apply(stream);
+        PCollection<KV<String, MyDummyEvent>> keyedStream =
                 eventsPColl
                         .apply("Add key", WithKeys.of(e -> e.getMsgKey()))
                         .setCoder(
                                 KvCoder.of(
                                         AvroCoder.of(String.class),
-                                        ProtoCoder.of(Events.MyDummyEvent.class)));
+                                        ProtoCoder.of(MyDummyEvent.class)));
 
-        PCollection<KV<String, Iterable<Events.MyDummyEvent>>> sorted =
-                keyedStream.apply(
-                        "Sort with state", SortWithAnnotations.Transform.withSessionDuration(30));
+        PCollection<KV<String, Iterable<MyDummyEvent>>> sorted =
+                keyedStream.apply("Sort with window", transform);
 
-        PCollection<Iterable<Events.MyDummyEvent>> keysDropped =
+        PCollection<Iterable<MyDummyEvent>> keysDropped =
                 sorted.apply(
                         "Drop keys",
                         MapElements.into(
                                         TypeDescriptors.iterables(
-                                                TypeDescriptor.of(Events.MyDummyEvent.class)))
+                                                TypeDescriptor.of(MyDummyEvent.class)))
                                 .via(kv -> kv.getValue()));
 
         PCollection<Boolean> check = keysDropped.apply("Check", TestUtils.Check.isSorted());
 
-        PAssert.thatSingleton("Windowed elements are sorted", check).isEqualTo(true);
+        PAssert.thatSingleton(textMsg, check).isEqualTo(true);
         PAssert.thatSingletonIterable("Same elements as input", keysDropped)
                 .containsInAnyOrder(
                         events.stream().map(ts -> ts.getValue()).collect(Collectors.toList()));
 
-        pipeline.run();
+        return pipeline;
     }
 }

@@ -30,7 +30,7 @@ import org.apache.beam.sdk.values.PCollection;
 import org.joda.time.Duration;
 import org.joda.time.Instant;
 
-public class SortWithAnnotations {
+public class SortWithMapState {
     @AutoValue
     public abstract static class Transform
             extends PTransform<
@@ -39,24 +39,23 @@ public class SortWithAnnotations {
 
         public abstract int sessionGap();
 
-        public static Transform withSessionDuration(int duration) {
-            return new AutoValue_SortWithAnnotations_Transform.Builder()
-                    .sessionGap(duration)
-                    .build();
+        public static SortWithMapState.Transform withSessionDuration(int duration) {
+            return new AutoValue_SortWithMapState_Transform.Builder().sessionGap(duration).build();
         }
 
         @AutoValue.Builder
         public abstract static class Builder {
-            public abstract Transform.Builder sessionGap(int d);
+            public abstract SortWithMapState.Transform.Builder sessionGap(int d);
 
-            public abstract Transform build();
+            public abstract SortWithMapState.Transform build();
         }
 
         @Override
         public PCollection<KV<String, Iterable<MyDummyEvent>>> expand(
                 PCollection<KV<String, MyDummyEvent>> input) {
             return input.apply(
-                    "Sort with state", ParDo.of(new RecoverSessionDoFn(this.sessionGap())));
+                    "Sort with state",
+                    ParDo.of(new SortWithMapState.RecoverSessionDoFn(this.sessionGap())));
         }
     }
 
@@ -69,8 +68,11 @@ public class SortWithAnnotations {
         @StateId("currentKey")
         private final StateSpec<ValueState<String>> currentKeySpec = StateSpecs.value();
 
-        @StateId("elementsList")
-        private final StateSpec<ValueState<List<MyDummyEvent>>> eventsListSpec = StateSpecs.value();
+        @StateId("index")
+        private final StateSpec<ValueState<Integer>> indexSpec = StateSpecs.value();
+
+        @StateId("elementsMap")
+        private final StateSpec<MapState<Integer, MyDummyEvent>> eventsMapSpec = StateSpecs.map();
 
         // The maximum element timestamp seen so far.
         @StateId("maxTimestampSeen")
@@ -92,22 +94,22 @@ public class SortWithAnnotations {
                 @Element KV<String, MyDummyEvent> element,
                 @Timestamp Instant elementTimestamp,
                 @StateId("currentKey") ValueState<String> currentKeyState,
+                @AlwaysFetched @StateId("index") ValueState<Integer> indexState,
                 @AlwaysFetched @StateId("holdingUpAfterLastMsg")
                         ValueState<Boolean> currentlyHoldingUpState,
-                @AlwaysFetched @StateId("elementsList")
-                        ValueState<List<MyDummyEvent>> eventsListState,
+                @StateId("elementsMap") MapState<Integer, MyDummyEvent> eventsMapState,
                 @StateId("maxTimestampSeen") CombiningState<Long, long[], Long> maxTimestampState,
                 @TimerId("gapTimer") Timer gapTimer,
                 OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
             // Update state
             currentKeyState.write(element.getKey());
-
-            List<MyDummyEvent> events = eventsListState.read();
-            if (events == null) {
-                events = new ArrayList<>();
+            Integer currentIndex = indexState.read();
+            if (currentIndex == null) {
+                currentIndex = 0;
             }
-            events.add(element.getValue());
-            eventsListState.write(events);
+            eventsMapState.put(currentIndex, element.getValue());
+            indexState.write(currentIndex + 1);
+
             maxTimestampState.add(elementTimestamp.getMillis());
             // Check if we have met the conditions to close the session
             boolean isLastMsg = element.getValue().getIsLastMsg();
@@ -128,24 +130,30 @@ public class SortWithAnnotations {
         @OnTimer("gapTimer")
         public void onGapTimer(
                 @AlwaysFetched @StateId("currentKey") ValueState<String> currentKeyState,
-                @StateId("holdingUpAfterLastMsg") ValueState<Boolean> currentlyHoldingUpState,
-                @AlwaysFetched @StateId("elementsList")
-                        ValueState<List<MyDummyEvent>> eventsListState,
-                @AlwaysFetched @StateId("maxTimestampSeen")
-                        CombiningState<Long, long[], Long> maxTimestampState,
+                @AlwaysFetched @StateId("index") ValueState<Integer> indexState,
+                @AlwaysFetched @StateId("holdingUpAfterLastMsg")
+                        ValueState<Boolean> currentlyHoldingUpState,
+                @StateId("elementsMap") MapState<Integer, MyDummyEvent> eventsMapState,
+                @StateId("maxTimestampSeen") CombiningState<Long, long[], Long> maxTimestampState,
                 OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
 
             String key = currentKeyState.read();
-            List<MyDummyEvent> events = eventsListState.read();
 
-            // events.sort(new Events.MyDummyEventComparator()); <-- NO NEED TO SORT
+            List<MyDummyEvent> events = new ArrayList<>();
+
+            for (int k = 0; k < indexState.read(); k++) {
+                events.add(eventsMapState.get(k).read());
+            }
+
+            // sort(new MyDummyEventComparator()); <-- NO NEED TO SORT
 
             receiver.outputWithTimestamp(
                     KV.of(key, events), Instant.ofEpochMilli(maxTimestampState.read()));
 
             currentKeyState.clear();
             currentlyHoldingUpState.clear();
-            eventsListState.clear();
+            indexState.clear();
+            eventsMapState.clear();
             maxTimestampState.clear();
         }
     }
