@@ -16,19 +16,22 @@ limitations under the License.
 package dev.herraiz.beam.transform;
 
 import com.google.auto.value.AutoValue;
-import dev.herraiz.beam.utils.Events;
 import dev.herraiz.protos.Events.MyDummyEvent;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
+import org.apache.beam.sdk.extensions.sorter.BufferedExternalSorter;
+import org.apache.beam.sdk.extensions.sorter.SortValues;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.GroupByKey;
 import org.apache.beam.sdk.transforms.PTransform;
 import org.apache.beam.sdk.transforms.ParDo;
 import org.apache.beam.sdk.transforms.windowing.AfterWatermark;
+import org.apache.beam.sdk.transforms.windowing.FixedWindows;
 import org.apache.beam.sdk.transforms.windowing.Sessions;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.Lists;
 import org.joda.time.Duration;
 
 public class SortWithWindows {
@@ -38,10 +41,82 @@ public class SortWithWindows {
                     PCollection<KV<String, MyDummyEvent>>,
                     PCollection<KV<String, Iterable<MyDummyEvent>>>> {
 
-        public abstract int sessionGap();
-
         public static Transform withSessionDuration(int duration) {
             return new AutoValue_SortWithWindows_Transform.Builder().sessionGap(duration).build();
+        }
+
+        public abstract int sessionGap();
+
+        @Override
+        public PCollection<KV<String, Iterable<MyDummyEvent>>> expand(
+                PCollection<KV<String, MyDummyEvent>> input) {
+
+            // Add timestamps as sorting key
+            PCollection<KV<String, KV<Long, MyDummyEvent>>> secondaryKey =
+                    input.apply(
+                            "Add secondary key",
+                            ParDo.of(
+                                    new DoFn<
+                                            KV<String, MyDummyEvent>,
+                                            KV<String, KV<Long, MyDummyEvent>>>() {
+                                        @ProcessElement
+                                        public void processElement(
+                                                @Element KV<String, MyDummyEvent> element,
+                                                OutputReceiver<KV<String, KV<Long, MyDummyEvent>>>
+                                                        receiver) {
+                                            receiver.output(
+                                                    KV.of(
+                                                            element.getKey(),
+                                                            KV.of(
+                                                                    element.getValue()
+                                                                            .getEventTimestamp(),
+                                                                    element.getValue())));
+                                        }
+                                    }));
+
+            //            PCollection<KV<String, MyDummyEvent>> windowed =
+            //                    input.apply(
+            //                            "Session windowing",
+            //                            Window.<KV<String, MyDummyEvent>>into(
+            //
+            // Sessions.withGapDuration(Duration.standardSeconds(30)))
+            //                                    .triggering(AfterWatermark.pastEndOfWindow())
+            //                                    .discardingFiredPanes()
+            //                                    .withAllowedLateness(Duration.ZERO));
+
+//            PCollection<KV<String, KV<Long, MyDummyEvent>>> windowed =
+//                    secondaryKey.apply(
+//                            "Session windowing",
+//                            Window.<KV<String, KV<Long, MyDummyEvent>>>into(
+//                                            Sessions.withGapDuration(Duration.standardSeconds(30)))
+//                                    .triggering(AfterWatermark.pastEndOfWindow())
+//                                    .discardingFiredPanes()
+//                                    .withAllowedLateness(Duration.ZERO));
+
+            PCollection<KV<String, KV<Long, MyDummyEvent>>> windowed =
+                    secondaryKey.apply(
+                            "Session windowing",
+                            Window.<KV<String, KV<Long, MyDummyEvent>>>into(
+                                            FixedWindows.of(Duration.standardSeconds(600)))
+                                    .triggering(AfterWatermark.pastEndOfWindow())
+                                    .discardingFiredPanes()
+                                    .withAllowedLateness(Duration.ZERO));
+
+            //            PCollection<KV<String, Iterable<MyDummyEvent>>> grouped =
+            //                    windowed.apply("Group by key", GroupByKey.create());
+
+            PCollection<KV<String, Iterable<KV<Long, MyDummyEvent>>>> grouped =
+                    windowed.apply("Group by key", GroupByKey.create());
+
+            PCollection<KV<String, Iterable<KV<Long, MyDummyEvent>>>> sorted =
+                    grouped.apply(
+                            "Sort",
+                            SortValues.<String, Long, MyDummyEvent>create(
+                                    BufferedExternalSorter.options()));
+
+            //            return grouped.apply("Drop secondary key", ParDo.of(new
+            // SortWithWindowsDoFn()));
+            return grouped.apply("Drop secondary key", ParDo.of(new DropSecondaryKeyDoFn()));
         }
 
         @AutoValue.Builder
@@ -50,38 +125,38 @@ public class SortWithWindows {
 
             public abstract Transform build();
         }
-
-        @Override
-        public PCollection<KV<String, Iterable<MyDummyEvent>>> expand(
-                PCollection<KV<String, MyDummyEvent>> input) {
-
-            PCollection<KV<String, MyDummyEvent>> windowed =
-                    input.apply(
-                            "Session windowing",
-                            Window.<KV<String, MyDummyEvent>>into(
-                                            Sessions.withGapDuration(Duration.standardSeconds(30)))
-                                    .triggering(AfterWatermark.pastEndOfWindow())
-                                    .discardingFiredPanes()
-                                    .withAllowedLateness(Duration.ZERO));
-
-            PCollection<KV<String, Iterable<MyDummyEvent>>> grouped =
-                    windowed.apply("Group by key", GroupByKey.create());
-
-            return grouped.apply("Sort", ParDo.of(new SortWithWindowsDoFn()));
-        }
     }
 
-    private static class SortWithWindowsDoFn
-            extends DoFn<KV<String, Iterable<MyDummyEvent>>, KV<String, Iterable<MyDummyEvent>>> {
+    //    private static class SortWithWindowsDoFn
+    //            extends DoFn<KV<String, Iterable<MyDummyEvent>>, KV<String,
+    // Iterable<MyDummyEvent>>> {
+    //        @ProcessElement
+    //        public void processElement(
+    //                @Element KV<String, Iterable<MyDummyEvent>> element,
+    //                OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
+    //
+    //            List<MyDummyEvent> events = Lists.newArrayList(element.getValue());
+    //            events.sort(new Events.MyDummyEventComparator());
+    //
+    //            receiver.output(KV.of(element.getKey(), events));
+    //        }
+    //    }
+
+    private static class DropSecondaryKeyDoFn
+            extends DoFn<
+                    KV<String, Iterable<KV<Long, MyDummyEvent>>>,
+                    KV<String, Iterable<MyDummyEvent>>> {
         @ProcessElement
         public void processElement(
-                @Element KV<String, Iterable<MyDummyEvent>> element,
+                @Element KV<String, Iterable<KV<Long, MyDummyEvent>>> element,
                 OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
 
-            List<MyDummyEvent> events = Lists.newArrayList(element.getValue());
-            events.sort(new Events.MyDummyEventComparator());
+            List<MyDummyEvent> sorted_events =
+                    StreamSupport.stream(element.getValue().spliterator(), false)
+                            .map(kv -> kv.getValue())
+                            .collect(Collectors.toList());
 
-            receiver.output(KV.of(element.getKey(), events));
+            receiver.output(KV.of(element.getKey(), sorted_events));
         }
     }
 }
