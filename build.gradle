@@ -29,7 +29,7 @@ ext {
 	autoServiceVersion = '1.1.1'
 	protoVersion = '4.35.1'
 
-	googleJavaFormat = '1.15.0'
+	googleJavaFormat = '1.25.0'
 }
 
 repositories {
@@ -52,6 +52,12 @@ test {
 
 compileJava {
 	options.compilerArgs.addAll(['-Xlint:deprecation'])
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+	}
 }
 
 run {
