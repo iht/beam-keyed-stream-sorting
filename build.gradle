@@ -27,7 +27,7 @@ ext {
 	hamcrestVersion = "2.2"
 	autoValueVersion = '1.11.1'
 	autoServiceVersion = '1.1.1'
-	protoVersion = '3.25.9'
+	protoVersion = '4.35.1'
 
 	googleJavaFormat = '1.15.0'
 }
