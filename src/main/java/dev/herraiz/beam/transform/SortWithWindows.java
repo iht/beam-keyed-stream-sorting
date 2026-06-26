@@ -18,6 +18,7 @@ package dev.herraiz.beam.transform;
 import com.google.auto.value.AutoValue;
 import dev.herraiz.beam.utils.Events;
 import dev.herraiz.protos.Events.MyDummyEvent;
+import java.util.ArrayList;
 import java.util.List;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.transforms.GroupByKey;
@@ -28,7 +29,6 @@ import org.apache.beam.sdk.transforms.windowing.Sessions;
 import org.apache.beam.sdk.transforms.windowing.Window;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
-import org.apache.beam.vendor.guava.v26_0_jre.com.google.common.collect.Lists;
 import org.joda.time.Duration;
 
 public class SortWithWindows {
@@ -78,7 +78,8 @@ public class SortWithWindows {
                 @Element KV<String, Iterable<MyDummyEvent>> element,
                 OutputReceiver<KV<String, Iterable<MyDummyEvent>>> receiver) {
 
-            List<MyDummyEvent> events = Lists.newArrayList(element.getValue());
+            List<MyDummyEvent> events = new ArrayList<>();
+            element.getValue().forEach(events::add);
             events.sort(new Events.MyDummyEventComparator());
 
             receiver.output(KV.of(element.getKey(), events));

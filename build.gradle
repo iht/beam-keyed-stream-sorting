@@ -20,7 +20,7 @@ ext {
 	appName = "DealingWithOrder"
 	appVersion = "${gitVersion()}-SNAPSHOT"
 
-	beamVersion = "2.48.0"
+	beamVersion = "2.74.0"
 
 	slf4jVersion = "1.7.36"
 	junitVersion = "4.13.2"
