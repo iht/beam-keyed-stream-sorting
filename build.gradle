@@ -83,6 +83,12 @@ dependencies {
 	testImplementation "org.hamcrest:hamcrest:${hamcrestVersion}"
 }
 
+protobuf {
+	protoc {
+		artifact = "com.google.protobuf:protoc:${protoVersion}"
+	}
+}
+
 // Package a self-contained jar file.
 jar {
 	archiveBaseName = packageName
