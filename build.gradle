@@ -25,7 +25,7 @@ ext {
 	slf4jVersion = "1.7.36"
 	junitVersion = "4.13.2"
 	hamcrestVersion = "2.2"
-	autoValueVersion = '1.10'
+	autoValueVersion = '1.11.1'
 	autoServiceVersion = '1.1.1'
 	protoVersion = '3.22.0'
 
