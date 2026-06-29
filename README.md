@@ -54,7 +54,7 @@ Each transform in `src/main/java/dev/herraiz/beam/transform/` demonstrates a dif
 4. **Run Unit Tests:** Observe how out-of-order streams are simulated and verified using Beam's `TestStream`.
 
 ### Prerequisites
-* **Java Development Kit (JDK):** Version 11 or higher.
+* **Java Development Kit (JDK):** Version 25 or higher.
 * **Gradle:** Included via wrapper (`./gradlew`).
 
 ### Running Tests
